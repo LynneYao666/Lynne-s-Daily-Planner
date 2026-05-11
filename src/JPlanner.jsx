@@ -10,16 +10,14 @@ const COLORS = [
 ];
 
 const STORAGE_KEY = "j-planner-data";
-const TODAY = new Date().toISOString().split("T")[0];
 
 function pad(n) { return String(n).padStart(2, "0"); }
 function nowTime() {
   const d = new Date();
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
-function formatDate(iso) {
-  const d = new Date(iso + "T00:00:00");
-  return d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+function formatDate() {
+  return new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
 }
 
 export default function JPlanner() {
@@ -28,23 +26,22 @@ export default function JPlanner() {
   const [showForm, setShowForm] = useState(false);
   const [newTask, setNewTask] = useState({ time: nowTime(), title: "", color: "coral", note: "" });
   const [punchAnim, setPunchAnim] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const data = JSON.parse(raw);
-        if (data.date === TODAY) {
-          setTasks(data.tasks || []);
-          setCheckInTime(data.checkInTime || null);
-        }
+        setTasks(data.tasks || []);
+        setCheckInTime(data.checkInTime || null);
       }
     } catch {}
   }, []);
 
   const save = useCallback((t, c) => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ date: TODAY, tasks: t, checkInTime: c }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ tasks: t, checkInTime: c }));
     } catch {}
   }, []);
 
@@ -79,16 +76,25 @@ export default function JPlanner() {
     setTimeout(() => setPunchAnim(false), 800);
   };
 
+  const handleNewDay = () => {
+    setTasks([]);
+    setCheckInTime(null);
+    setShowConfirm(false);
+    localStorage.removeItem(STORAGE_KEY);
+  };
+
   const done = tasks.filter(t => t.done).length;
   const total = tasks.length;
   const pct = total ? Math.round((done / total) * 100) : 0;
 
   return (
     <div style={{ fontFamily: "system-ui, sans-serif", maxWidth: 520, margin: "0 auto", padding: "1.5rem 1rem 4rem", minHeight: "100vh" }}>
+
+      {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.5rem" }}>
         <div>
           <p style={{ margin: 0, fontSize: 11, color: "#aaa", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>Daily Plan</p>
-          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 400, color: "#1a1a1a", lineHeight: 1.2 }}>{formatDate(TODAY)}</h1>
+          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 400, color: "#1a1a1a", lineHeight: 1.2 }}>{formatDate()}</h1>
         </div>
         <button onClick={handleCheckIn} style={{ display: "flex", flexDirection: "column", alignItems: "center", background: checkInTime ? "#eaf7f2" : "#f5f5f5", border: checkInTime ? "0.5px solid #1D9E75" : "0.5px solid #ddd", borderRadius: 16, padding: "10px 16px", cursor: checkInTime ? "default" : "pointer", transform: punchAnim ? "scale(1.08)" : "scale(1)", transition: "all 0.25s ease", minWidth: 80 }}>
           <span style={{ fontSize: 20, marginBottom: 2 }}>{checkInTime ? "✓" : "⏱"}</span>
@@ -97,6 +103,7 @@ export default function JPlanner() {
         </button>
       </div>
 
+      {/* Progress */}
       {total > 0 && (
         <div style={{ marginBottom: "1.5rem" }}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
@@ -106,10 +113,11 @@ export default function JPlanner() {
           <div style={{ height: 6, background: "#f0f0f0", borderRadius: 99, overflow: "hidden" }}>
             <div style={{ height: "100%", width: `${pct}%`, background: pct === 100 ? "#1D9E75" : "#7F77DD", borderRadius: 99, transition: "width 0.5s ease" }} />
           </div>
-          {pct === 100 && <p style={{ margin: "8px 0 0", fontSize: 12, color: "#0F6E56", fontWeight: 500 }}>All done for today!</p>}
+          {pct === 100 && <p style={{ margin: "8px 0 0", fontSize: 12, color: "#0F6E56", fontWeight: 500 }}>🎉 All done for today — nice work!</p>}
         </div>
       )}
 
+      {/* Task list */}
       <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: "1rem" }}>
         {tasks.length === 0 && !showForm && (
           <div style={{ textAlign: "center", padding: "2.5rem 1rem", background: "#f9f9f9", borderRadius: 16, border: "0.5px dashed #ddd" }}>
@@ -143,6 +151,7 @@ export default function JPlanner() {
         })}
       </div>
 
+      {/* Add form */}
       {showForm && (
         <div style={{ background: "white", border: "0.5px solid #e5e5e5", borderRadius: 16, padding: "16px", marginBottom: "0.75rem" }}>
           <p style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 500, color: "#888" }}>New task</p>
@@ -153,7 +162,7 @@ export default function JPlanner() {
           <input type="text" placeholder="Note (optional)" value={newTask.note} onChange={e => setNewTask(p => ({ ...p, note: e.target.value }))} style={{ width: "100%", fontSize: 13, padding: "6px 10px", borderRadius: 8, border: "0.5px solid #ddd", background: "#f9f9f9", color: "#1a1a1a", boxSizing: "border-box", marginBottom: 12 }} />
           <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
             {COLORS.map(c => (
-              <button key={c.id} onClick={() => setNewTask(p => ({ ...p, color: c.id }))} style={{ width: 24, height: 24, borderRadius: "50%", background: c.dot, border: "none", cursor: "pointer", outline: newTask.color === c.id ? `3px solid ${c.dot}` : "none", outlineOffset: 2, transition: "all 0.15s" }} />
+              <button key={c.id} onClick={() => setNewTask(p => ({ ...p, color: c.id }))} style={{ width: 24, height: 24, borderRadius: "50%", background: c.dot, border: "none", cursor: "pointer", outline: newTask.color === c.id ? `3px solid ${c.dot}` : "none", outlineOffset: 2 }} />
             ))}
           </div>
           <div style={{ display: "flex", gap: 8 }}>
@@ -168,7 +177,27 @@ export default function JPlanner() {
           <span style={{ fontSize: 18, lineHeight: 1 }}>+</span> Add task
         </button>
       )}
-      <p style={{ textAlign: "center", marginTop: "2.5rem", fontSize: 11, color: "#ccc", letterSpacing: "0.08em" }}>PLAN · EXECUTE · CHECK IN · REPEAT</p>
+
+      {/* New Day button */}
+      {tasks.length > 0 && (
+        <div style={{ marginTop: "1.5rem", textAlign: "center" }}>
+          {!showConfirm ? (
+            <button onClick={() => setShowConfirm(true)} style={{ fontSize: 12, color: "#ccc", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>
+              Start a new day (clears all tasks)
+            </button>
+          ) : (
+            <div style={{ background: "#fff8f0", border: "0.5px solid #f5c89a", borderRadius: 12, padding: "12px 16px" }}>
+              <p style={{ margin: "0 0 10px", fontSize: 13, color: "#885500" }}>Clear everything and start fresh?</p>
+              <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+                <button onClick={() => setShowConfirm(false)} style={{ padding: "6px 16px", fontSize: 13, borderRadius: 8, border: "0.5px solid #ddd", background: "transparent", cursor: "pointer", color: "#888" }}>Cancel</button>
+                <button onClick={handleNewDay} style={{ padding: "6px 16px", fontSize: 13, borderRadius: 8, border: "none", background: "#EF9F27", cursor: "pointer", color: "white", fontWeight: 500 }}>Yes, new day</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      <p style={{ textAlign: "center", marginTop: "2rem", fontSize: 11, color: "#ccc", letterSpacing: "0.08em" }}>PLAN · EXECUTE · CHECK IN · REPEAT</p>
     </div>
   );
 }
